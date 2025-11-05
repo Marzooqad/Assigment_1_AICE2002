@@ -1,0 +1,61 @@
+Task 1
+• Describe what you did you make train/valid/test sets
+– There is no one right answer, this depends on how you
+setup your experiments
+– Justify your decision
+– Some ideas are provided under task 1
+
+Task 2
+• Describe how you pre-processed the data
+– There is no one right answer, this depends on how you
+setup your experiments
+– Justify your decision
+– Some ideas are provided under task 2
+– You can decide to pre-process your data before or after
+you divide into train/valid/test splits. Justify your
+decisions
+
+Task 3
+• Describe which algorithms you use in your experiments
+– You are required to compare at least 2
+– There is no one right answer, this depends on how you
+setup your experiments
+– Justify your decision
+– Some ideas are provided under task 3
+– Recommend using ones we have covered in class, but
+you are not limited. Whatever you choose, justify it
+
+Task 4
+• Describe what you did with the data across the 3 datasets
+– Did you make one large dataset
+– Did you experiment on them individually
+– Describe what you did and why
+
+Task 5
+• How did you evaluate performance?
+– Did you use a confusion matrix?
+– Show it in your report
+• https://scikitlearn.org/stable/modules/generated/sklearn.metrics.confusion
+_matrix.html
+– Did you use accuracy, F1, Precision, Recall, etc?
+– Did you use Area Under Curve or ROC plots?
+– Show it in your report and discuss why you chose one over another
+and what you observe
+
+
+Task 6
+• What hyperparameters did you explore?
+– Tons of ways to address this (k-fold, algorithms, etc)
+– Report what you did, what the results are, why you
+chose to explore certain parameters, etc
+
+Task 7
+• Reflect on your experiment design and results
+• What else would you try if you had more time
+• Did your experiments answer the research question, why or
+why not?
+• This should be your ‘conclusion’ of your report
+
+
+There are 88 audio features
+5 data labels

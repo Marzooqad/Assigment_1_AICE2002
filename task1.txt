@@ -1,0 +1,41 @@
+We implemented a speaker-based stratified split with a 
+70/15/15 ratio for train/validation/test sets. Each speaker 
+appears in only one split to prevent data leakage and test the 
+model's ability to generalize to new speakers. We stratified by 
+gender to maintain balanced representation of male and female speakers
+across all splits. All three systems (System_Orig, System_X, System_Y) 
+were combined to create a larger, more robust dataset, allowing us to test 
+label predictability across different audio processing conditions. 
+This approach directly addresses the research question while avoiding
+artificially inflated performance from speaker overlap. 
+K-fold cross-validation was not used due to the limited number of speakers (30) 
+and the complexity of implementing group-based k-fold splitting.
+
+What NOT to do: Random sample split
+If you randomly split samples, the same speaker could appear in both training and test sets. This means:
+
+The model learns to recognize individual voices rather than general patterns
+Test performance would be artificially inflated (too optimistic)
+You're testing "have I seen this person before?" instead of "can I predict labels for new people?"
+
+we have 15 male and 15 female
+
+while female and male voice diffrences should be recognised 
+you need to biased to remove bias from AI
+I think this is asking about label difficulity and not gender specfic. so keep both genders together
+
+I will combine all three data systems, more traning data = better performance about 3x more samples per speaker)
+it will be a true test rather than having diffrent system biases 
+it will also make the experiments simpler since the analysis would be one instead of 3
+
+
+K-fold would not be a good option becuase the data is very small in my opinon
+if it was 200+ speakers k fold would be worth and it would have close to max realiabilty
+
+
+
+Next steps: 
+Count how many samples of lamb/goat/sheep/wolf you have
+Ensure consistent splits for fair comparison
+Verify no data leakage
+document document document

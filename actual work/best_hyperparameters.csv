@@ -1,0 +1,5 @@
+Model,Target,max_depth,min_samples_leaf,min_samples_split,n_estimators,CV_F1_Macro,C,gamma
+Random Forest,target_human,10.0,1.0,2.0,50.0,,,
+Random Forest,target_asv,10.0,1.0,2.0,50.0,,,
+SVM,target_human,,,,,,0.1,0.001
+SVM,target_asv,,,,,,0.1,0.001

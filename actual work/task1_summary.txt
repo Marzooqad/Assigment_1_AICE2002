@@ -1,0 +1,36 @@
+
+TASK 1: DATA SPLITTING STRATEGY AND JUSTIFICATION
+
+Data Preparation (Lines 1-30):
+We combined all three systems (system_Original, system_X, system_Y) into a single 
+dataset containing 4923 samples. This decision aligns with the assignment 
+requirement to test label predictability across different audio processing conditions.
+
+Speaker-Based Splitting (Lines 31-100):
+To prevent data leakage, we implemented speaker-based stratified splitting where each 
+of the 30 speakers appears in only ONE split:
+- Training set: 20 speakers (3291 samples, 66.8%)
+- Validation set: 5 speakers (804 samples, 16.3%)
+- Test set: 5 speakers (828 samples, 16.8%)
+
+This approach ensures the model must generalize to NEW speakers, not just memorize 
+voice characteristics of speakers seen during training.
+
+Random Seed (Line 15):
+Set random_state=42 for reproducibility of results.
+
+Class Distribution (Lines 131-180):
+Both target_human (imbalance ratio: 8.90) and target_asv (imbalance 
+ratio: 27.29) exhibit severe class imbalance. This will be addressed 
+in Task 2 through preprocessing techniques.
+
+Why NOT k-fold cross-validation:
+With only 30 speakers, implementing proper speaker-based stratified k-fold 
+would result in very small validation folds (~6 speakers per fold for 5-fold CV), 
+making performance estimates unstable. Our fixed 70/15/15 split provides sufficient 
+data for reliable model training and evaluation.
+
+IMPORTANT NOTE: Due to random speaker assignment, the test set for target_human 
+lacks the "lamb" class entirely. This reflects real-world scenarios where models 
+must handle class distribution shifts between training and deployment. We will 
+evaluate using F1-macro and per-class metrics to properly account for this.
