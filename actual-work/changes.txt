@@ -1,0 +1,3 @@
+
+Summary of Changes:
+FileLinesChangeWhystep4_model_training.py15-16Add from imblearn.over_sampling import SMOTEImport SMOTEstep4_model_training.py110-115Add SMOTE before clf.fit()Balance training dataReport Task 2N/ADocument the approachExplain methodologyReport Task 7N/ADiscuss iterationShow critical thinking

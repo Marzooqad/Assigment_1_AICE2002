@@ -1,0 +1,17 @@
+AICE2002_Assignment1/
+├── report.pdf                                    ✅ REQUIRED
+├── step2 data splitting.py                       ✅ REQUIRED
+├── step3 preprocessing.py                        ✅ REQUIRED
+├── step4 model training.py                       ✅ REQUIRED
+├── step4 improved smote.py                       ✅ REQUIRED
+├── step4 final xgboost.py                        ✅ REQUIRED
+├── step4 final xgboost with noise.py              ✅ OPTIONAL (but good to include)
+└── step5 hyperparameter tuning.py                ✅ REQUIRED
+
+SUMMARY:
+- Total files: 8
+- Required files: 7
+- Optional files: 1 (noise experiment)
+- Status: ✅ READY TO ZIP
+
+

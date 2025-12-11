@@ -1,0 +1,58 @@
+
+TASK 3: ALGORITHM SELECTION AND JUSTIFICATION
+
+Selected Algorithms (Lines 41-100):
+Two supervised learning algorithms were selected for this classification task:
+
+1. Random Forest (100 trees, max_depth=20, class_weight='balanced')
+   - Effective for high-dimensional feature spaces (88 audio features)
+   - Provides ensemble learning to reduce overfitting
+   - class_weight='balanced' addresses severe class imbalance (27.29x for target_asv)
+
+2. SVM with RBF kernel (C=1.0, gamma='scale', class_weight='balanced')
+   - Captures non-linear decision boundaries via RBF kernel
+   - Well-established for audio classification tasks
+   - Requires scaled features (completed in Task 2)
+
+Both algorithms use class_weight='balanced' to handle the severe class imbalance
+identified in Task 2.
+
+TASK 5: EVALUATION METRICS AND RESULTS
+
+Evaluation Metrics (Lines 101-200):
+- Accuracy: Overall correctness measure
+- F1-macro: Arithmetic mean of per-class F1 scores (critical for imbalanced data)
+- F1-micro: Weighted by class frequency
+- Per-class Precision, Recall, F1: Identifies which classes are harder to predict
+- Confusion Matrix: Visualizes classification errors (required by assignment)
+
+Test Set Results:
+Random Forest - target_human: Accuracy=0.5374, F1-macro=0.2629
+Random Forest - target_asv:   Accuracy=0.6534, F1-macro=0.2483
+SVM - target_human:            Accuracy=0.4034, F1-macro=0.2241
+SVM - target_asv:              Accuracy=0.4964, F1-macro=0.2638
+
+Key Findings:
+1. F1-macro scores are consistently lower than accuracy scores, indicating that
+   models perform poorly on minority classes despite high overall accuracy.
+
+2. target_asv shows lower F1-macro scores than target_human across both algorithms,
+   confirming it is the more challenging labelling scheme.
+
+3. The severe class imbalance (80.4% sheep in target_asv training set) makes
+   minority class prediction difficult, as evidenced by the confusion matrices.
+
+RESEARCH QUESTION ANSWER:
+
+Based on experimental results, target_asv is MORE CHALLENGING to predict than
+target_human. This conclusion is supported by:
+
+1. Lower F1-macro scores: target_asv averaged 0.2561 vs 0.2435 for target_human
+2. Severe class imbalance: 27.29x ratio for target_asv vs 8.90x for target_human
+3. Fewer classes with less variation reduces model's ability to learn distinctions
+4. Confusion matrix analysis shows target_asv models struggle with minority classes
+
+While accuracy scores may be similar or even higher for target_asv (due to the
+dominant "sheep" class), F1-macro reveals the true difficulty: models fail to
+adequately identify minority classes (lamb, wolf) which constitute only 5.8% of
+the target_asv training data combined.

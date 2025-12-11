@@ -1,0 +1,846 @@
+\documentclass[conference]{IEEEtran}
+
+\usepackage{cite}
+
+\usepackage{amsmath,amssymb,amsfonts}
+
+\usepackage{graphicx}
+
+\usepackage{booktabs}
+
+\usepackage{multirow}
+
+
+
+\begin{document}
+
+
+
+\title{Which Labeling Scheme is Harder to Predict? Comparing Human and Automated Labels in Audio Classification}
+
+
+
+\author{\IEEEauthorblockN{Your Name [36517445]}
+
+\IEEEauthorblockA{\textit{School of Electronics and Computer Science} \\
+
+\textit{University of Southampton}\\
+
+}}
+
+
+
+\maketitle
+
+
+
+\begin{abstract}
+
+This study tackles a very practical question: are labels created by human perception (target\_human) or automated speaker verification (target\_asv) harder to predict from audio features? Working with 4,923 audio samples from 30 speakers, quickly discovering the real challenge wasn't the labeling scheme itself, but severe class imbalance---some classes appeared 27 times more often than others. This led to through several iterations: starting with standard approaches, then adding SMOTE oversampling when those failed, then combining SMOTE with aggressive class weights, and finally switching from Random Forest to XGBoost. The results? Target\_human proved slightly harder (F1-macro: 0.19-0.26) than target\_asv (0.24-0.31), but both were genuinely difficult. This managed to improve wolf class detection from 0\% to 31\%, but the lamb class remained completely undetectable despite our best efforts, suggesting the audio features themselves might not contain enough information to distinguish lamb from sheep.
+
+\end{abstract}
+
+
+
+\begin{IEEEkeywords}
+
+Audio classification, class imbalance, SMOTE, XGBoost, and machine learning
+
+\end{IEEEkeywords}
+
+
+
+\section{Introduction}
+
+
+
+\textbf{The Research Question:} Which labeling scheme, target\_human or target\_asv, is more challenging to predict using audio features?
+
+
+
+At first glance, this seems straightforward: train some classifiers, compare their performance, report which target was harder and then it's done, but as the report shows  the journey was more complicated and interesting than that. The dataset contains 88 audio features extracted from speech samples, with 30 speakers (15 male, 15 female) and three different audio processing systems. Each sample is labeled as one of four categories: lamb, goat, sheep, or wolf.
+
+
+
+The real story of this assignment isn't just about which target was harder, it's about discovering a fundamental problem (extreme class imbalance), trying standard solutions that didn't quite work, iterating with more aggressive approaches, and ultimately learning that some problems have inherent limitations that even advanced techniques can't solve.
+
+
+
+\section{Quantifying Bias in Our Data}
+
+
+
+Before diving into the methods, there's a critical issue that need to addressing: bias. In machine learning, bias doesn't just mean unfairness, it refers to systematic patterns in the data that could make our results misleading. Although sometimes bias is needed it's not here.
+
+
+
+\subsection{The Class Imbalance Problem}
+
+
+
+Looking at The training data distribution (analysed in Lines 131-180 of step2\_data\_splitting.py) shows concerning numbers:
+
+
+
+\textbf{For target\_human:}
+
+\begin{itemize}
+
+    \item Sheep: 1,931 samples (58.7\%)
+
+    \item Goat: 763 samples (23.2\%)
+
+    \item Wolf: 380 samples (11.5\%)
+
+    \item Lamb: 217 samples (6.6\%)
+
+\end{itemize}
+
+
+
+This gives an \textbf{imbalance ratio of 8.9x}, meaning the data contain almost 9 times more sheep samples than lamb samples.
+
+
+
+\textbf{For target\_asv, it's even worse:}
+
+\begin{itemize}
+
+    \item Sheep: 2,647 samples (80.4\%)
+
+    \item Goat: 450 samples (13.7\%)
+
+    \item Lamb: 97 samples (2.9\%)
+
+    \item Wolf: 97 samples (2.9\%)
+
+\end{itemize}
+
+
+
+The \textbf{imbalance ratio here is 27.29x}, absolutely massive.
+
+
+
+\subsection{Why This Makes Performance Misleading}
+
+
+
+Here's the problem: if a model was built that just predicts "sheep" every single time, it'd get 80.4\% accuracy on target\_asv without learning anything useful. This is why one can't trust accuracy as the main metric. Instead, in the report F1-macro was used, which treats all classes equally and reveals when a model is just guessing the majority class.
+
+
+
+The baseline Random Forest achieved 65.3\% accuracy on target\_asv but had 0\% recall on lamb and wolf. Translation? It learned to predict sheep almost always, which worked often enough to look decent on paper but completely failed at the actual task of distinguishing between classes.
+
+
+
+\subsection{Other Sources of Bias}
+
+
+
+\textbf{Gender distribution:} The dataset has exactly 15 male and 15 female speakers, which is balanced. The balance was maintained across the train/valid/test splits through stratification (Lines 69-74, step2\_data\_splitting.py).
+
+
+
+\textbf{System processing:} All three audio systems (Original, X, and Y) were combined into one dataset, which means; mixing clean audio with AI-modified audio. This could introduce some systematic bias if the AI modifications consistently change how classes sound, but this was accepted to get more training data.
+
+
+
+\textbf{Test set issues:} Due to random speaker assignment, the test set for target\_human ended up with zero lamb samples. This means there's a limitation to this approach which is lamb performance detection can't be measured.
+
+% This means I can't measure lamb detection performance for that target at all, an unfortunate limitation of the splitting approach.
+
+
+
+\section{Task 1: How the data was Split}
+
+
+
+\subsection{The Speaker-Based Approach}
+
+
+
+The most important decision was to split by speaker, not by individual samples (implemented in Lines 61-100 of step2\_data\_splitting.py). Here's why this matters:  if all the samples were randomly shuffled into samples and then split, the same speaker would start appearing in both training and test sets.The model would learn to recognise individual voices rather than learning the patterns needed to detect.
+
+% if I randomly shuffled all samples and then split, I'd end up with the same speakers appearing in both training and test sets. The model would learn to recognise individual voices rather than learning the actual patterns I care about.
+
+
+
+By ensuring each speaker appears in only one split, testing whether the model can generalise to completely new people, which is what would be the aim in a real life scenario.
+
+
+
+\begin{figure}[h]
+\centering
+\includegraphics[width=0.9\columnwidth]{step2_data_splitting.png}
+\caption{Speaker-based data splitting visualization showing distribution across train/valid/test sets and class distributions within each split.}
+\label{fig:splitting}
+\end{figure}
+
+
+
+\subsection{The Numbers}
+
+
+
+Combined all three systems to get 4,923 total samples, then split them:
+
+\begin{itemize}
+
+    \item \textbf{Training:} 20 speakers, 3,291 samples (66.8\%)
+
+    \item \textbf{Validation:} 5 speakers, 804 samples (16.3\%)
+
+    \item \textbf{Testing:} 5 speakers, 828 samples (16.8\%)
+
+\end{itemize}
+
+
+
+% Verified there was zero overlap between splits, no speaker appears in multiple sets. Random state was set to 42 so the could reproduce our results exactly.
+
+Verified there was zero overlap between the splits, speakers not appearing in multiple sets. Random sate was set to 42.
+
+
+
+\subsection{Why Not K-Fold Cross-Validation?}
+
+
+
+With only 30 speakers total, doing 5 fold cross-validation would mean each fold has only about 6 speakers. That's a really small validation set, and the results would be pretty unstable. The fixed 70/15/15 split gives more reliable evaluation with enough data in each set.
+
+
+
+\section{Task 2: Preprocessing - A Journey of Iteration}
+
+
+
+% This section tells the story of how I progressively realised the initial approaches weren't working and had to get more aggressive.
+
+This section shows the story of how the first approaches weren't really working and it had to get a bit more aggressive. 
+
+
+
+\subsection{Step 1: The Baseline (The sarting point?)}
+
+
+
+\textbf{Feature scaling:} The StandardScaler was applied to all 88 audio features (Lines 69-143 in step3\_preprocessing.py). This is basically required for SVM to work properly, and it doesn't hurt for Random Forest either. The scalar was fit on training data to avoid data leakage, then the same transformation was applied to validation and tests setss
+
+% I fit the scaler only on training data to avoid data leakage, then applied the same transformation to validation and test sets.
+
+
+
+\begin{figure}[h]
+\centering
+\includegraphics[width=0.9\columnwidth]{step3_preprocessing.png}
+\caption{Feature distributions before and after StandardScaler normalization, showing the transformation to zero mean and unit variance.}
+\label{fig:preprocessing}
+\end{figure}
+
+
+
+\textbf{Class imbalance handling:} The starting paramter was sklearn's \texttt{class\_weight='balanced'}, which automatically adjusts weights based on class frequencies. This is the standard first approach everyone tries usually.
+
+
+
+\textbf{What happened:} The models trained fine, got reasonable accuracy (40-65\%), and it appeared to be. Then after looking at the per class results, lamb and wolf had 0\% recall, the models weren't detecting them at all. Back to the drawing board.
+
+
+
+\subsection{Step 2: Adding SMOTE (The First Fix)}
+
+
+
+With only 97 lamb samples out of 3,291 total training samples (2.9\%), the models just didn't have enough examples to learn from. So SMOTE was implemented, Synthetic Minority Over-sampling Technique, in Lines 89-91 of step4\_improved\_smote.py.
+
+
+
+SMOTE works by creating synthetic samples of minority classes. It looks at existing minority samples, finds their nearest neighbors, and creates new samples by interpolating between them. After applying SMOTE, our training sets looked like:
+
+\begin{itemize}
+
+    \item target\_human: 3,291 → 7,724 samples (all classes balanced at 25\% each)
+
+    \item target\_asv: 3,291 → 10,588 samples (all classes balanced at 25\% each)
+
+\end{itemize}
+
+
+
+\textbf{Did it work?} Sort of. Wolf recall improved from 0\% to 8-17\%, which was very encouraging. But lamb stayed at 0\%. something more aggressive is needed.
+
+
+
+\subsection{Step 3: SMOTE Plus Aggressive Weights (Getting Serious)}
+
+
+
+If SMOTE alone wasn't enough, maybe the model needed to be forced to care about the smaller classes. So manual class weights were added on top of SMOTE (Lines 80-100 in step4\_improved\_combined.py):
+
+
+
+\textbf{For target\_human:} sheep=1, goat=8, lamb=30, wolf=15
+
+
+
+\textbf{For target\_asv:} sheep=1, goat=10, lamb=50, wolf=50
+
+
+
+These numbers mean the model treats misclassifying one lamb sample as bad as misclassifying 30-50 sheep samples. That's extremely aggressive weighting, but this is dealing with an extremely imbalanced problem.
+
+
+
+\textbf{Results:} Wolf detection jumped to 31.58\% recall for Random Forest on target\_asv, a visible improvement. But lamb? Still 0\%. Overall accuracy dropped from 65.3\% to 59.3\%, but F1-macro improved from 0.248 to 0.294. This trade-off makes sense: the model stopped just predicting sheep all the time, which hurt accuracy but improved actual classification performance.
+
+
+
+\subsection{Step 4: Switching to XGBoost (The Final Attempt)}
+
+
+
+At this point, there was a suspicioun that Random Forest might be fundamentally wrong for this problem. Random Forest builds many independent decision trees and averages their predictions. With 80\% of the data being sheep, most trees learn to predict sheep, and averaging them doesn't help.
+
+
+
+XGBoost (Extreme Gradient Boosting) works differently, it builds trees sequentially, with each new tree specifically trying to correct the errors made by previous trees. This iterative error correction is exactly what is required for extreme imbalance.
+
+
+
+Implemented this in step4\_final\_xgboost.py with these settings:
+
+\begin{itemize}
+
+    \item n\_estimators=200 (more trees than Random Forest's 100)
+
+    \item max\_depth=6 (shallower than Random Forest's 20 to prevent it from overfitting)
+
+    \item Combined with SMOTE and extreme weights (lamb=100x)
+
+\end{itemize}
+
+
+
+
+
+\subsection{Step 5: Adding Gaussian Noise (Data Augmentation Experiment)}
+
+
+
+Tot test the model's durability and try using data augmentation techniques, gaussian noise (σ=0.05) was added tot the training data alongside SMOTE resampling (implemented beforehand in step4). This approach adds noise to the already balanced SMOTE data, this simulates a real world example without disturbing the class balance. 
+
+
+
+The noise trial showed very small impact on the performance. XGBoost achieved F1-macro of 0.289 on target_asv (very identical to the no-noise version), while SVM showed a small 
+
+improvement (F1-macro: 0.252 vs 0.234). Wolf detection remained similar, and still no lamb detection. This suggests that the classification challenge is not due to overfitting, but lamb and sheep might be very similar when comparing using the dataset.
+
+
+
+Implemented this in step4\_final\_xgboost.py with these settings:
+
+\begin{itemize}
+
+    \item n\_estimators=200 (more trees than Random Forest's 100)
+
+    \item max\_depth=6 (shallower than Random Forest's 20 to prevent it from overfitting)
+
+    \item Combined with SMOTE and extreme weights (lamb=100x)
+
+\end{itemize}
+
+
+
+\textbf{Results:} XGBoost achieved 0.289 F1-macro on target\_asv (best overall) and 0.209 on target\_human. Wolf recall reached 32.26\% for XGBoost on target\_asv. the best minority class detection. However, lamb remained at 0\% recall across all models. The extreme weights (100x) and XGBoost's iterative approach improved wolf detection but couldn't overcome the lamb/sheep detection.
+
+\section{Task 3: Why Were these algorithms Chosen }
+
+
+
+\subsection{Random Forest (Baseline Choice)}
+
+
+
+The project was started with Random Forest (Lines 80-95 in step4\_model\_training.py) for several solid reasons:
+
+\begin{itemize}
+
+    \item It handles 88 features without needing dimensionality reduction
+
+    \item The ensemble approach (100 trees voting) reduces overfitting
+
+    \item It's strong towards outliers and doesn't strictly require scaled features
+
+    \item It gives feature importance rankings if the results were to be looked at
+
+\end{itemize}
+
+
+
+\textbf{Why not other options?}
+
+\begin{itemize}
+
+    \item \textbf{Single decision tree:} Would overfit badly with 88 features
+
+    \item \textbf{K-Nearest Neighbors:} Terrible with 88 dimensions (curse of dimensionality), extremely slow
+
+    \item \textbf{Naive Bayes:} Assumes features are independent, which definitely isn't true for audio features
+
+    \item \textbf{Neural networks:} Need way more than 3,291 training samples to work well
+
+\end{itemize}
+
+
+
+\subsection{Support Vector Machine (Second Algorithm)}
+
+
+
+In here Random Forest was paired with SVM using an RBF (Radial Basis Function) kernel (Lines 96-105 in step4\_model\_training.py). The RBF kernel lets SVM find complex, non-linear decision boundaries, which is important when one is trying to separate four classes in 88-dimensional space.
+
+
+
+Configuration: C=1.0 initially (increased to 10.0 in final version), gamma='scale'
+
+
+
+\textbf{Why RBF kernel specifically?}
+
+\begin{itemize}
+
+    \item \textbf{Linear kernel:} Too simple---four classes in 88D space are unlikely to be linearly separable
+
+    \item \textbf{Polynomial kernel:} More hyperparameters to tune, tends to overfit
+
+    \item \textbf{Sigmoid kernel:} Basically acts like a simple neural network without the advantages
+
+\end{itemize}
+
+
+
+\subsection{XGBoost (Final Replacement)}
+
+
+
+After seeing Random Forest fail at small class detection, there was a switch to XGBoost as the final approach. Here's the key difference:
+
+
+
+\textbf{Random Forest:} $\hat{y} = \text{mode}\{h_1(x), h_2(x), ..., h_{100}(x)\}$
+
+
+
+Each tree is independent. With 80\% sheep in training data, most trees learn to predict sheep, and voting doesn't fix that.
+
+
+
+\textbf{XGBoost:} $\hat{y} = \sum_{t=1}^{200} f_t(x)$ where each $f_t$ minimises the error left by previous trees
+
+
+
+This sequential error correction is exactly what why it's used, later trees specifically focus on the minority class samples that earlier trees got wrong.
+
+
+
+Industry evidence backs this up: fraud detection systems (where fraud might be 0.1\% of transactions) and anomaly detection systems consistently use boosting methods like XGBoost rather than random forest for exactly this reason.
+
+
+
+\section{Task 4: Combining Systems}
+
+
+
+ All three audio processing systems (Original, X, Y) were combined into one dataset. This gave three times as much training data and gives a chance to test whether labels are predictable across different audio processing approaches.
+
+
+
+The alternative would have been running three separate experiments, one per system. That would have only been 1,641 training samples each and made the analysis much more complicated. Given that the preliminary analysis showed similar feature distributions across systems, combining them made sense.
+
+
+
+\section{Task 5: Results and What They Mean}
+
+
+
+\subsection{Why these metrics?}
+
+
+
+\textbf{F1-macro:} Our primary metric. It calculates F1 score for each class separately, then averages them. This treats all classes equally regardless of how common they are, which is crucial for imbalanced data.
+
+
+
+\textbf{Accuracy:} It's reported because it's standard procedure, but it's misleading here. A model that predicts "sheep" every time gets 80\% accuracy on target\_asv.
+
+
+
+\textbf{Per-class precision/recall:} These show us exactly which classes are problematic.
+
+
+
+\textbf{Confusion matrices:} Visual representation of what the model is actually predicting versus what's true.
+
+
+
+\subsection{The Results Across All Iterations}
+
+
+
+\begin{table}[h]
+
+\caption{How performance evolved through the iterations}
+
+\centering
+
+\small
+
+\begin{tabular}{llcc}
+
+\toprule
+
+Approach & Model & Accuracy & F1-macro \\
+
+\midrule
+
+Baseline & RF (human) & 0.537 & 0.263 \\
+
+(class weights) & RF (asv) & 0.653 & 0.248 \\
+
+ & SVM (human) & 0.403 & 0.224 \\
+
+ & SVM (asv) & 0.496 & 0.264 \\
+
+\midrule
+
+SMOTE only & RF (human) & 0.477 & 0.256 \\
+
+ & RF (asv) & 0.603 & 0.278 \\
+
+ & SVM (human) & 0.435 & 0.235 \\
+
+ & SVM (asv) & 0.560 & 0.247 \\
+
+\midrule
+
+SMOTE + & RF (human) & 0.478 & 0.255 \\
+
+Aggressive & RF (asv) & 0.593 & 0.294 \\
+
+Weights & SVM (human) & 0.330 & 0.194 \\
+
+ & SVM (asv) & 0.545 & 0.244 \\
+
+\midrule
+
+\multirow{2}{*}{XGBoost} & XGB (human) & 0.339 & 0.209 \\
+
+(Final) & XGB (asv) & 0.577 & 0.289 \\
+
+ & SVM (human) & 0.453 & 0.238 \\
+
+ & SVM (asv) & 0.599 & 0.234 \\
+
+\bottomrule
+
+\end{tabular}
+
+\label{tab:all_results}
+
+\end{table}
+
+
+
+\begin{figure}[h]
+
+\centering
+
+\includegraphics[width=0.9\columnwidth]{confusion_matrices_final.png}
+
+\caption{Confusion matrices for XGBoost and SVM on both target variables, 
+
+showing per-class prediction patterns. Diagonal elements represent correct 
+
+predictions, while off-diagonal elements show misclassifications.}
+
+\label{fig:confusion}
+
+\end{figure}
+
+
+
+\begin{figure}[h]
+
+\centering
+
+\includegraphics[width=0.9\columnwidth]{performance_comparison.png}
+
+\caption{Performance evolution across all experimental iterations, comparing F1-macro scores for different approaches.}
+
+\label{fig:performance}
+
+\end{figure}
+
+
+
+\subsection{What Each Class Achieved}
+
+
+
+Looking at the best results (Random Forest with SMOTE + aggressive weights):
+
+
+
+\textbf{Sheep:} 58-86\% recall---not perfect but reasonable. The model learned to identify sheep fairly well.
+
+
+
+\textbf{Goat:} 2-45\% recall. Significant variation between models.
+
+% recall—struggled but not hopeless. Significant
+
+% variation between models
+
+
+
+\textbf{Wolf:} Started at 0\%, peaked at 32.26\% recall with XGBoost on target\_asv---this is our success story. The combination of SMOTE, aggressive weighting, and XGBoost's iterative error correction finally worked for wolf.
+
+
+
+\textbf{Lamb:} 0\% recall across every single approach here, complete failure. Even with 100x class weights, SMOTE creating thousands of synthetic samples, and XGBoost's iterative error correction, never managed to detect a single lamb correctly.
+
+
+
+\subsection{What the Lamb Failure shows}
+
+
+
+The fact that lamb detection failed despite extreme counteractions suggests something fundamental: the 88 audio features probably don't contain enough information to distinguish lamb from sheep. This isn't a failure of the methods used, it's a limitation of the features themselves. To improve this:
+
+\begin{itemize}
+
+    \item Different audio features that better capture lamb/sheep differences, using the help of acoustic engineers 
+
+    \item Raw audio and deep learning to learn features automatically
+
+    % \item Domain expertise to engineer specific features targeting this distinction
+
+\end{itemize}
+
+
+
+\section{Task 6: Hyperparameter Tuning}
+
+
+
+GridSearchCV was used with 3-fold cross-validation on our baseline models (step5\_hyperparameter\_tuning.py). Search spaces included:
+
+
+
+\textbf{Random Forest:} n\_estimators [50, 100, 200], max\_depth [10, 20, 30, None], min\_samples\_split [2, 5, 10], min\_samples\_leaf [1, 2, 4]
+
+
+
+\textbf{SVM:} C [0.1, 1.0, 10.0], gamma [0.001, 0.01, 0.1, 'scale']
+
+
+
+\textbf{Best parameters found:} RF (n\_estimators=50, max\_depth=10), SVM (C=0.1, gamma=0.001)
+
+
+
+Interestingly, these are actually simpler models than our defaults (fewer trees, shallower depth, lower C). This makes sense, with severe class imbalance, simpler models that regularise more heavily can perform better.
+
+
+
+\begin{figure}[h]
+
+\centering
+
+\includegraphics[width=0.9\columnwidth]{hyperparameter_tuning_results.png}
+
+\caption{Hyperparameter tuning results showing F1-macro scores across different parameter combinations for Random Forest and SVM.}
+
+\label{fig:hyperparams}
+
+\end{figure}
+
+
+
+\textbf{Impact:} F1-macro improved by about 20\% for target\_asv, though target\_human results were mixed.
+
+
+
+\section{Answering the Research Question}
+
+
+
+\textbf{So which labeling scheme is harder to predict?}
+
+
+
+Based on F1-macro scores, target\_human is more challenging (0.19-0.24) compared to target\_asv (0.23-0.29), but honestly? They're both hard, and the difference is pretty small.
+
+
+
+The more interesting finding is \textit{why} both are difficult:
+
+\begin{itemize}
+
+    \item The extreme class imbalance (especially target\_asv's 27.29x ratio) creates a strong bias toward predicting the majority class
+
+    \item The audio features don't seem to capture the distinctions needed, particularly between lamb and sheep
+
+    \item With only 97 original minority class samples, even sophisticated techniques like SMOTE can't generate enough realistic variation
+
+\end{itemize}
+
+
+
+\textbf{What worked in the approach:}
+
+\begin{itemize}
+
+    \item Speaker-based splitting prevented data leakage and tested real generalisation
+
+    \item Using F1-macro as the primary metric revealed problems accuracy hid
+
+    \item SMOTE + aggressive weighting improved wolf detection from 0\% to 31.58\%
+
+    \item XGBoost's iterative approach was better fit to extreme imbalance than Random Forest
+
+\end{itemize}
+
+
+
+\textbf{What didn't work:}
+
+\begin{itemize}
+
+    \item Automatic class weighting was way too conservative for 27x imbalance
+
+    \item SMOTE by itself provided data but not learning rewards
+
+    \item Nothing in all the trials could detect lamb at all
+
+    \item High accuracy turned out to be a misleading metric
+
+\end{itemize}
+
+
+
+\section{Limitations and What could be done Differently}
+
+
+
+\textbf{Current limitations:}
+
+\begin{itemize}
+
+    \item The test set keeps the original imbalance, so models trained on balanced SMOTE data face distribution shift
+
+    \item SMOTE-generated samples were an addition of only 97 original lamb samples, probably not enough diversity
+
+    \item There was constraint set by the 88 features provided; can't extract new ones without raw audio
+
+    \item Time and computational limits prevented more extensive hyperparameter searches
+
+\end{itemize}
+
+
+
+\textbf{If there was more time and resources:}
+
+\begin{itemize}
+
+    \item Try more advanced sampling: ADASYN (adaptive synthetic sampling) or Borderline-SMOTE
+
+    \item Build ensemble methods that combine multiple models trained on different class subsets
+
+    \item Experiment with deep learning using focal loss (specifically designed for imbalance)
+
+    \item Engineer domain-specific audio features based on acoustic properties that distinguish lamb from sheep
+
+    \item Audio features based on acoustic properties to differ lamb from sheep
+
+    \item Try treating minority classes as outliers rather than standard classification
+
+    % anomalies
+
+\end{itemize}
+
+
+
+\section{Conclusion}
+
+
+
+Both target\_human and target\_asv present classification challenges under severe class imbalance, with F1-macro scores ranging from 0.19 to 0.31 across the experiments. Target\_human was proved to be more difficult, but the difference is small enough that both labeling schemes prove similarly challenging.
+
+
+
+The real story here is about iterative refinement and learning from failure. The journey from baseline class weighting through SMOTE to aggressive manual weights to XGBoost shows how trying different approaches when standard methods don't work is necessary. Successfully improved wolf class detection from 0\% to 32.26\% recall using XGBoost with 100x class weights, which demonstrates that the techniques do help, just not enough to overcome limitations in the features.
+
+
+
+The persistent inability to detect lamb despite extreme measures (100x class weights, thousands of synthetic samples, XGBoost's error correction) suggests there was brick wall that these preprocessing and algorithmic techniques can't break through. The features themselves probably don't encode the information needed to distinguish lamb from sheep.
+
+
+
+This experience reinforces an important lesson: choosing the right evaluation metrics matters enormously. If the study only looked at accuracy, It would appear that the baseline models were doing okay at 40-65\% accuracy. F1-macro revealed the truth, they were mostly just guessing sheep.
+
+
+
+The marginal difference between target\_human and target\_asv answers the research question, but perhaps the more valuable insight is understanding the limitations of the different approaches and what would be needed to push performance further.
+
+
+
+Noise augmentation was added as an additional experiment, Gaussian noise (σ=0.05) was added to test the models durability. Minimal changes showed, even data augmentation techniques couldn't overcome the main challenge of distinguishing lamb from sheep.
+
+
+
+\begin{thebibliography}{00}
+
+\bibitem{smote} Chawla, N. V., Bowyer, K. W., Hall, L. O., \& Kegelmeyer, W. P. (2002). SMOTE: synthetic minority over-sampling technique. \textit{Journal of Artificial Intelligence Research}, 16, 321-357.
+
+
+
+\bibitem{xgboost} Chen, T., \& Guestrin, C. (2016). XGBoost: A scalable tree boosting system. \textit{Proceedings of the 22nd ACM SIGKDD International Conference on Knowledge Discovery and Data Mining}, 785-794.
+
+
+
+\bibitem{audio_svm} Giannakopoulos, T., \& Pikrakis, A. (2014). \textit{Introduction to Audio Analysis: A MATLAB Approach}. Academic Press.
+
+
+
+\bibitem{code_split} step2\_data\_splitting.py. Contains speaker-based stratified splitting implementation (Lines 61-100) and class distribution analysis (Lines 108-137).
+
+
+
+\bibitem{code_preprocess} step3\_preprocessing.py. Feature scaling implementation with StandardScaler (Lines 121-180).
+
+
+
+\bibitem{code_baseline} step4\_model\_training.py. Baseline Random Forest and SVM implementation with class weighting (Lines 37-123).
+
+
+
+\bibitem{code_smote} step4\_improved\_smote.py. SMOTE oversampling implementation (Lines 89-91) and aggressive class weighting (Lines 80-100).
+
+
+
+\bibitem{code_xgboost} step4\_final\_xgboost.py. Final XGBoost implementation with extreme weighting (lamb=100x) and label encoding for multiclass support (Lines 89-110, 110-129).
+
+
+
+\bibitem{code_tuning} step5\_hyperparameter\_tuning.py. GridSearchCV implementation with 3-fold cross-validation for hyperparameter optimisation (Lines 66-108).
+
+
+
+\end{thebibliography}
+
+
+
+\end{document}
+

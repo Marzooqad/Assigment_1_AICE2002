@@ -1,0 +1,75 @@
+
+TASK 6: HYPERPARAMETER TUNING
+
+Methodology (Lines 41-100):
+Hyperparameter optimization was performed using GridSearchCV with 3-fold 
+cross-validation. F1-macro was selected as the optimization metric due to 
+the severe class imbalance in both target variables.
+
+Search Spaces:
+Random Forest: 108 parameter combinations
+  - n_estimators: [50, 100, 200]
+  - max_depth: [10, 20, 30, None]
+  - min_samples_split: [2, 5, 10]
+  - min_samples_leaf: [1, 2, 4]
+
+SVM: 12 parameter combinations
+  - C: [0.1, 1.0, 10.0]
+  - gamma: [0.001, 0.01, 0.1, 'scale']
+
+Best Parameters Found:
+
+Random Forest - target_human:
+  max_depth: 10
+  min_samples_leaf: 1
+  min_samples_split: 2
+  n_estimators: 50
+
+Random Forest - target_asv:
+  max_depth: 10
+  min_samples_leaf: 1
+  min_samples_split: 2
+  n_estimators: 50
+
+SVM - target_human:
+  C: 0.1
+  gamma: 0.001
+
+SVM - target_asv:
+  C: 0.1
+  gamma: 0.001
+
+Performance Improvements:
+
+Random Forest - target_human:
+  Baseline F1-macro: 0.2629
+  Tuned F1-macro: 0.2612
+  Improvement: -0.0017 (-0.7%)
+
+Random Forest - target_asv:
+  Baseline F1-macro: 0.2483
+  Tuned F1-macro: 0.3027
+  Improvement: +0.0544 (+21.9%)
+
+SVM - target_human:
+  Baseline F1-macro: 0.2241
+  Tuned F1-macro: 0.1831
+  Improvement: -0.0410 (-18.3%)
+
+SVM - target_asv:
+  Baseline F1-macro: 0.2638
+  Tuned F1-macro: 0.3152
+  Improvement: +0.0514 (+19.5%)
+
+Analysis:
+Hyperparameter tuning resulted in varying degrees of improvement across models.
+The tuned parameters helped the models better balance the trade-off between
+learning minority class patterns and avoiding overfitting. However, the severe
+class imbalance (particularly the 27.29x ratio in target_asv) continues to
+limit overall performance, as evidenced by the moderate F1-macro scores.
+
+Alternative approaches that could further improve performance include:
+1. Ensemble methods combining multiple tuned models
+2. Advanced sampling techniques (SMOTE, ADASYN)
+3. Feature engineering to create more discriminative features
+4. Deep learning approaches with specialized loss functions for imbalanced data

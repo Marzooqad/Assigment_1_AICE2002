@@ -1,0 +1,62 @@
+
+TASK 2: CLASS IMBALANCE HANDLING - COMBINED APPROACH
+
+Initial Approach (Baseline):
+The baseline implementation used class_weight='balanced' in both classifiers
+to address the severe class imbalance (8.90x for target_human, 27.29x for
+target_asv). However, evaluation revealed a critical limitation: models
+achieved 0% recall on minority classes (lamb, wolf) despite moderate overall
+accuracy. This indicated that automatic class weighting alone was insufficient.
+
+Root Cause Analysis:
+With only 97 lamb samples and 97 wolf samples in the 3,291-sample training set
+for target_asv (2.9% each), the models lacked sufficient minority class
+examples to learn discriminative patterns. The dominant "sheep" class (80.4%)
+overwhelmed the learning process.
+
+Improved Approach - Combined SMOTE + Aggressive Manual Weights (Lines 80-120):
+A two-pronged strategy was implemented to address this severe imbalance:
+
+1. SMOTE Oversampling (Lines 110-120):
+   SMOTE generates synthetic minority class samples by interpolating between
+   existing samples in feature space, creating a balanced training distribution.
+   
+2. Aggressive Manual Class Weights (Lines 80-100):
+   Beyond SMOTE, manual class weights were set to heavily penalize 
+   misclassification of minority classes:
+   - target_human: sheep=1, goat=8, lamb=30, wolf=15
+   - target_asv: sheep=1, goat=10, lamb=50, wolf=50
+   
+   These weights force the model to treat a single misclassified lamb/wolf
+   as 30-50x more costly than a misclassified sheep, dramatically shifting
+   the learning focus toward minority classes.
+
+Implementation:
+Training set sizes after SMOTE:
+- target_human: 3291 -> 7724 samples (all classes balanced)
+- target_asv: 3291 -> 10588 samples (all classes balanced)
+
+The combination provides both sufficient training examples (via SMOTE) AND
+strong learning incentives (via manual weights) for minority classes.
+
+Justification for Combined Approach:
+1. SMOTE alone: Provides examples but models may still ignore minorities
+2. Manual weights alone: Incentivizes learning but insufficient examples
+3. SMOTE + Manual weights: Addresses both the data scarcity AND learning bias
+
+This combined approach represents best practices from the imbalanced learning
+literature, particularly for extreme imbalance ratios (>25x).
+
+Results Comparison:
+See performance tables above showing improvements in minority class recall
+compared to baseline. The aggressive weighting accepts lower overall accuracy
+in exchange for better minority class detection, which is appropriate when
+minority classes are critical (e.g., fraud detection, rare disease diagnosis).
+
+Limitations:
+Despite this combined approach, some minority classes (particularly lamb)
+may still show low recall if they are genuinely difficult to distinguish
+from majority classes in the feature space. The test set retains the original
+imbalanced distribution, so deployment would face similar challenges. Further
+improvements would require domain-specific feature engineering or deep learning
+approaches with specialized architectures for imbalanced data.
